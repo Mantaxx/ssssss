@@ -1,0 +1,9 @@
+---
+description: "Zasady obliczeniowe dla logiki zgodnej z regulaminem PZHGP."
+alwaysApply: true
+---
+# Zasady obliczeniowe PZHGP
+- Podczas implementacji lub modyfikacji logiki obliczeniowej dla list konkursowych, ściśle przestrzegaj wzorca projektowego "Strategia" zdefiniowanego w `src/backend/services/race-calculator/`.
+- Każda nowa strategia obliczeniowa (np. dla nowego typu mistrzostw) musi implementować interfejs `CalculationStrategy`.
+- W celu uzyskania szczegółowych informacji o wzorach na współczynnik (coefficient) i punktację GMP, odwołaj się do dokumentacji projektu: `docs/pzhgp-rules.md`.
+- Unikaj umieszczania logiki obliczeniowej bezpośrednio w kontrolerach lub modelach.

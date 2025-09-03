@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Fancier {
+  id        Int      @id @default(autoincrement())
+  name      String?
+  pzhgp_id  String?
+  club_id   String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  lofts     Loft[]
+  pigeons   Pigeon[]
+  results   Result[]
+}
+
+model Loft {
+  id          Int      @id @default(autoincrement())
+  fancier     Fancier? @relation(fields: [fancierId], references: [id])
+  fancierId   Int?
+  address     String?
+  // PostGIS geography stored via raw SQL; Prisma can mirror as Decimal[]/Json if needed.
+  locationWkt String?  @map("location_wkt")
+  is_verified Boolean   @default(false)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+}
+
+model Pigeon {
+  id         Int      @id @default(autoincrement())
+  fancier    Fancier? @relation(fields: [fancierId], references: [id])
+  fancierId  Int?
+  ring_number String?  @unique
+  year       Int?
+  sex        String?
+  color      String?
+  strain     String?
+  sire         Pigeon?   @relation("Sire", fields: [sireId], references: [id])
+  sireId       Int?
+  dam          Pigeon?   @relation("Dam", fields: [damId], references: [id])
+  damId        Int?
+  sireOffspring Pigeon[] @relation("Sire")
+  damOffspring  Pigeon[] @relation("Dam")
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  results      Result[]
+}
+
+model ReleasePoint {
+  id             Int      @id @default(autoincrement())
+  name           String?
+  locationWkt    String?  @map("location_wkt")
+  source_document String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  races          Race[]
+}
+
+model Race {
+  id                       Int      @id @default(autoincrement())
+  name                     String?
+  release_point            ReleasePoint? @relation(fields: [releasePointId], references: [id])
+  releasePointId           Int?
+  release_datetime_utc     DateTime?
+  pzhgp_category           String?
+  total_pigeons_basketed   Int?
+  total_fanciers           Int?
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+  results                  Result[]
+}
+
+model Result {
+  id                  Int      @id @default(autoincrement())
+  race                Race?    @relation(fields: [raceId], references: [id])
+  raceId              Int?
+  pigeon              Pigeon?  @relation(fields: [pigeonId], references: [id])
+  pigeonId            Int?
+  fancier             Fancier? @relation(fields: [fancierId], references: [id])
+  fancierId           Int?
+  arrival_datetime_utc DateTime?
+  clocking_system_id  String?
+  position            Int?
+  speed_m_per_min     Decimal?
+  coefficient         Decimal?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+}
+

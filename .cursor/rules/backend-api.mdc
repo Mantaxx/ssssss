@@ -1,0 +1,10 @@
+---
+description: "Standardy dla endpointów API, w tym walidacja i obsługa błędów."
+globs: ["src/backend/api/**/*.ts"]
+alwaysApply: true
+---
+# Zasady dla endpointów API
+- Używaj `zod` do walidacji wszystkich przychodzących żądań (ciało, parametry, zapytania).
+- Zawsze zwracaj błędy w ustrukturyzowanym formacie JSON: `{ "error": { "message": "...", "code": "..." } }`.
+- Cała logika biznesowa musi być zawarta w serwisach (`src/backend/services`), a kontrolery API powinny być jak najcieńsze.
+- Używaj `Prisma` jako ORM do wszystkich interakcji z bazą danych PostgreSQL. Odwołaj się do schematu w `prisma/schema.prisma`.

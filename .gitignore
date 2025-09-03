@@ -1,0 +1,14 @@
+ # Zależności
+ /node_modules
+ /frontend/node_modules
+ 
+ # Pliki produkcyjne
+ /frontend/build
+ /frontend/.next
+ 
+ # Pliki środowiskowe
+ .env
+ /frontend/.env.local
+ 
+ # Pliki systemowe
+ .DS_Store

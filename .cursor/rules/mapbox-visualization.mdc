@@ -1,0 +1,11 @@
+---
+description: "Wytyczne dotyczące implementacji wizualizacji na mapach za pomocą Mapbox."
+globs: ["src/frontend/components/Map/**/*.tsx"]
+alwaysApply: true
+---
+# Wytyczne wizualizacji Mapbox
+- Wszystkie komponenty frontendu związane z mapami muszą używać biblioteki `Mapbox GL JS`.
+- Warstwy pogodowe (wiatr, temperatura) powinny być implementowane jako warstwy niestandardowe (`custom layer`) w celu uzyskania animacji cząsteczkowych.
+- Zawsze inicjuj mapę z projekcją `globe` i włączonym terenem 3D (`map.setTerrain(...)`).
+- Odwołaj się do `src/frontend/components/Map/layers/WindLayer.tsx` jako referencyjnej implementacji animowanej warstwy.
+- Używaj haków `useMap` do zarządzania instancją mapy w komponentach React.
