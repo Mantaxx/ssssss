@@ -27,7 +27,7 @@ export const RaceRouteLayer: React.FC<RaceRouteLayerProps> = ({
   const layerId = `route-layer-${routeId}`;
   const markerSourceId = `route-marker-source-${routeId}`;
   const markerLayerId = `route-marker-layer-${routeId}`;
-  const markerImageId = 'pigeon-marker-icon'; // Unikalne ID dla obrazka w stylu mapy
+  const markerImageId = `pigeon-marker-icon-${routeId}`; // Unikalne ID dla obrazka w stylu mapy
   const animationFrameId = useRef<number | null>(null);
 
   useEffect(() => {

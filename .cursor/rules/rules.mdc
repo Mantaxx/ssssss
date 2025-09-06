@@ -1,11 +1,6 @@
-# Zasady
-<!-- markdownlint-disable MD010 -->
-<!-- markdownlint-disable MD003 -->
-Always	Zawsze dołączana do kontekstu modelu dla danego projektu.
-Auto Attached	Dołączana tylko wtedy, gdy pliki pasujące do wzorca globs znajdują się w kontekście AI.
-Agent Requested	Dostępna dla AI, która decyduje, czy ją pobrać i użyć na podstawie opisu (description).
-Manual	Dołączana tylko wtedy, gdy zostanie jawnie wywołana w czacie za pomocą @nazwaZasady.---
-description:
-globs:
-alwaysApply: true
----
+| Typ Zasady | Opis |
+|---|---|
+| Always | Zawsze dołączana do kontekstu modelu dla danego projektu. |
+| Auto Attached | Dołączana tylko wtedy, gdy pliki pasujące do wzorca globs znajdują się w kontekście AI. |
+| Agent Requested | Dostępna dla AI, która decyduje, czy ją pobrać i użyć na podstawie opisu (description). |
+| Manual | Dołączana tylko wtedy, gdy zostanie jawnie wywołana w czacie za pomocą @nazwaZasady. |

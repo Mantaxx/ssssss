@@ -52,10 +52,10 @@ router.get('/competition-list/:raceId', async (req, res) => {
 
     const calcStrategy = strategy === 'gmp' ? GMPPointsStrategy() : StandardCoeffStrategy();
     const results = race.results.map((result) => {
-      if (!result.position || !race.total_pigeons_basketed) return result;
+      if (!result.position || !race.totalPigeonsBasketed) return result;
       const calculated = calcStrategy.calculate({
         position: result.position,
-        totalPigeonsBasketed: race.total_pigeons_basketed,
+        totalPigeonsBasketed: race.totalPigeonsBasketed,
       });
       return { ...result, coefficient: calculated.coefficient };
     });
@@ -65,8 +65,8 @@ router.get('/competition-list/:raceId', async (req, res) => {
       strategy,
       race: {
         name: race.name,
-        totalPigeonsBasketed: race.total_pigeons_basketed,
-        totalFanciers: race.total_fanciers,
+        totalPigeonsBasketed: race.totalPigeonsBasketed,
+        totalFanciers: race.totalFanciers,
       },
       results,
     });
@@ -75,5 +75,27 @@ router.get('/competition-list/:raceId', async (req, res) => {
   }
 });
 
-export default router;
+router.get('/:raceId/visualize', async (req, res) => {
+  const { raceId } = req.params;
 
+  try {
+    const race = await prisma.race.findUnique({
+      where: { id: parseInt(raceId) },
+      include: { releasePoint: true },
+    });
+
+    if (!race) {
+      return res.status(404).json({ error: { message: 'Race not found', code: 'NOT_FOUND' } });
+    }
+
+    const lofts = await prisma.loft.findMany({
+      include: { fancier: { select: { name: true } } },
+    });
+
+    return res.json({ race, lofts });
+  } catch (error: any) {
+    return res.status(500).json({ error: { message: error.message, code: 'INTERNAL_ERROR' } });
+  }
+});
+
+export default router;

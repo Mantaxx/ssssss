@@ -141,10 +141,10 @@ export class CompetitionListExporter {
       raceName: firstResult.race.name,
       releaseDate: firstResult.race.release_datetime_utc.toISOString().split('T')[0],
       totalPigeons: results.length,
-      results: results.map(result => ({
+      results: results.map((result) => ({
         position: result.position,
-        ringNumber: result.pigeon.ring_number,
-        fancierName: `${result.fancier.first_name} ${result.fancier.last_name}`,
+        ringNumber: result.pigeon.ringNumber,
+        fancierName: result.fancier.name,
         arrivalTime: result.arrival_datetime_utc.toISOString(),
         speed: Number(result.speed_m_per_min) || 0,
         coefficient: Number(result.coefficient) || 0,

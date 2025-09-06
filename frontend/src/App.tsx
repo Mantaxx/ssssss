@@ -1,38 +1,26 @@
-import React, { useState } from 'react';
-import { MapView } from './components/MapView';
-import { VoiceCommands } from './components/Voice/VoiceCommands';
-import { WeatherControls } from './components/WeatherControls';
+import Map from './components/Map';
 
-export const App: React.FC = () => {
-  const [altitude, setAltitude] = useState<string>('10m');
-  const [time, setTime] = useState<string>('now');
-
-  const handleVoice = (cmd: { layer?: string; altitude?: string; time?: string }) => {
-    if (cmd.altitude) setAltitude(cmd.altitude);
-    if (cmd.time) setTime(cmd.time);
-    // eslint-disable-next-line no-console
-    console.log('voice cmd', cmd);
-  };
-
-  const handleAltitudeChange = (alt: string) => {
-    setAltitude(alt);
-  };
-
-  const handleTimeChange = (t: string) => {
-    setTime(t);
-  };
-
+function App() {
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 p-6">
-      <h1 className="text-2xl font-semibold">columba — mapa i analizy</h1>
-      <p className="mt-2">placeholder interfejsu mapy (Mapbox GL JS)</p>
-      <MapView altitude={altitude} time={time} />
-      <WeatherControls 
-        onAltitudeChange={handleAltitudeChange}
-        onTimeChange={handleTimeChange}
-      />
-      <VoiceCommands onCommand={handleVoice} />
+    <div className="relative w-screen h-screen overflow-hidden bg-gray-900 text-white">
+      <header className="absolute top-0 left-0 z-10 w-full p-4 bg-black bg-opacity-50 backdrop-blur-sm">
+        <h1 className="text-2xl font-bold">Columba - Platforma Wyścigów Gołębi</h1>
+        <p className="text-sm text-gray-300">Wizualizacja lotów i analiza pogodowa</p>
+      </header>
+
+      <main className="w-full h-full">
+        <Map />
+      </main>
+
+      <aside className="absolute top-1/4 left-4 z-10 p-4 bg-black bg-opacity-70 rounded-lg w-80 backdrop-blur-sm">
+        <h2 className="text-lg font-semibold mb-2">Panel Sterowania</h2>
+        <p className="text-gray-400 text-sm">
+          Tutaj znajdą się opcje do sterowania wizualizacją, wyboru lotów, itp.
+        </p>
+        {/* Placeholder for controls */}
+      </aside>
     </div>
   );
-};
+}
 
+export default App;

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useMap } from '../hooks/useMap';
+import type { Map, MapMouseEvent } from 'mapbox-gl';
 
 interface Loft {
   id: number;
@@ -11,7 +12,7 @@ interface Loft {
 }
 
 interface LoftManagementProps {
-  map: any;
+  map: Map | null;
 }
 
 export const LoftManagement: React.FC<LoftManagementProps> = ({ map }) => {
@@ -20,7 +21,7 @@ export const LoftManagement: React.FC<LoftManagementProps> = ({ map }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [searchAddress, setSearchAddress] = useState('');
 
-  const handleMapClick = (e: any) => {
+  const handleMapClick = useCallback((e: MapMouseEvent & { lngLat: mapboxgl.LngLat }) => {
     if (!isAdding) return;
     
     const { lng, lat } = e.lngLat;
@@ -35,7 +36,7 @@ export const LoftManagement: React.FC<LoftManagementProps> = ({ map }) => {
     setLofts(prev => [...prev, newLoft]);
     setIsAdding(false);
     setSearchAddress('');
-  };
+  }, [isAdding, searchAddress]);
 
   const handleVerifyLoft = (loftId: number) => {
     setLofts(prev => prev.map(loft => 
@@ -55,7 +56,7 @@ export const LoftManagement: React.FC<LoftManagementProps> = ({ map }) => {
     return () => {
       map.off('click', handleMapClick);
     };
-  }, [map, isAdding, searchAddress]);
+  }, [map, handleMapClick]);
 
   return (
     <div className="bg-white p-4 rounded-lg border border-gray-200">

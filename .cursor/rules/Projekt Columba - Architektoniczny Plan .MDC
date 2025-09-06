@@ -1,0 +1,387 @@
+# Projekt Columba - Architektoniczny Plan dla Platformy Wyścigów Gołębi Opartej na Sztucznej Inteligencji
+Sekcja 1: Architektura Systemu i Rdzenne Schematy Danych
+Niniejsza sekcja ustanawia fundamentalną architekturę technologiczną i danych aplikacji. Decyzje podjęte na tym etapie zdeterminują skalowalność, łatwość utrzymania oraz wydajność całego systemu. Stanowi to podstawę, na której zbudowane zostaną wszystkie zaawansowane funkcjonalności, od przetwarzania danych po analizy AI i wizualizacje 3D.
+
+1.1. Rekomendacje Stosu Technologicznego
+Wybór odpowiednich technologii jest kluczowy dla sukcesu projektu o tak wysokim stopniu złożoności, który łączy przetwarzanie danych w czasie rzeczywistym, zaawansowane obliczenia geoprzestrzenne i intensywne wizualizacje.
+
+Backend: Do obsługi złożonych obliczeń, przetwarzania danych w czasie rzeczywistym i integracji z wieloma API wymagany jest wysoce wydajny framework. Rekomendowanym wyborem jest Node.js z TypeScript. Jego asynchroniczna, nieblokująca natura operacji wejścia-wyjścia (I/O) czyni go idealnym rozwiązaniem do zarządzania równoczesnymi wywołaniami API do Open-Meteo i Mapbox. Zastosowanie TypeScript zapewnia silne typowanie, co jest kluczowe dla utrzymania jakości i czytelności kodu w projekcie o tej skali, minimalizując ryzyko błędów w trakcie rozwoju i ułatwiając przyszłe modyfikacje.
+
+Frontend: Do budowy złożonego, interaktywnego interfejsu użytkownika, inspirowanego bogactwem wizualizacji aplikacji Ventusky, niezbędny jest nowoczesny, komponentowy framework. Głównymi kandydatami są
+
+React i Vue.js. Oba frameworki dostarczają niezbędnych narzędzi do zarządzania stanem aplikacji i tworzenia reużywalnych komponentów UI dla mapy, osi czasu i paneli informacyjnych. Architektura zostanie oparta na frameworku React, wykorzystując bibliotekę Mapbox GL JS do renderowania map, co zapewni dostęp do najnowszych i najbardziej zaawansowanych funkcji wizualizacyjnych tej platformy.
+
+Baza Danych: Optymalnym rozwiązaniem jest podejście hybrydowe. Jako główna relacyjna baza danych posłuży PostgreSQL z rozszerzeniem PostGIS. PostGIS dostarcza potężnych możliwości zapytań geoprzestrzennych, które są niezbędne do precyzyjnego obliczania odległości lotów oraz zarządzania współrzędnymi gołębników i miejsc wypuszczeń. Dodatkowo, pamięć podręczna Redis zostanie wykorzystana do zarządzania sesjami użytkowników oraz do buforowania często powtarzających się zapytań do API Open-Meteo. Takie rozwiązanie znacząco zredukuje opóźnienia i zminimalizuje koszty związane z wykorzystaniem zewnętrznych usług.
+
+Sztuczna Inteligencja / Uczenie Maszynowe (AI/ML): Model AI do analizy pogody zostanie opracowany w języku Python, z wykorzystaniem bibliotek takich jak TensorFlow lub PyTorch do budowy sieci neuronowych oraz Scikit-learn do wstępnego przetwarzania danych. Gotowy model będzie serwowany za pośrednictwem dedykowanego mikroserwisu, dostępnego dla głównego backendu Node.js poprzez REST API. Taka architektura mikroserwisów zapewnia separację zagadnień i umożliwia niezależne skalowanie i rozwijanie komponentu AI.
+
+1.2. Rdzenne Modele Danych (Cyfrowy Gołębnik)
+Schemat bazy danych stanowi jedyne źródło prawdy dla całej aplikacji. Musi być on na tyle solidny, aby obsłużyć zróżnicowane dane pochodzące z zegarów ESK i dokumentów PZHGP, a jednocześnie wystarczająco elastyczny, aby umożliwić przyszłą rozbudowę.
+
+Projektowanie schematu musi uwzględniać fundamentalną niedoskonałość danych wejściowych. Analiza źródeł wskazuje na ich wysoką fragmentację. Dane z zegarów ESK (takich jak Tipes, Benzing, AMC-ESK) są często w formatach własnościowych , podczas gdy dane PZHGP pochodzą z niestrukturyzowanych plików DOC i PDF. Oznacza to, że proces importu nieuchronnie napotka brakujące pola lub błędy parsowania. W związku z tym, schemat bazy danych nie może narzucać rygorystycznych ograniczeń    
+
+NOT NULL na wszystkie pola. Zamiast tego, powinien wykorzystywać pola dopuszczające wartość NULL i zawierać dodatkowe kolumny metadanych, takie jak data_source (źródło danych), ingestion_timestamp (czas importu) oraz validation_status (np. 'surowy', 'zweryfikowany', 'błąd'). Taki model pozwala na śledzenie jakości i pochodzenia każdego rekordu, umożliwiając działanie aplikacji nawet z niekompletnymi danymi, jednocześnie oznaczając je do weryfikacji przez administratora.
+
+Tabela 1: Rdzenny Schemat Bazy Danych
+Poniższa tabela przedstawia klarowną, relacyjną strukturę dla wszystkich kluczowych encji w domenie wyścigów gołębi. Stanowi ona architektoniczny plan bazy danych, zapewniając integralność danych i wydajność zapytań. Dobrze zdefiniowany schemat jest fundamentem każdej aplikacji opartej na danych. Bez niego dane stają się niespójne, zapytania złożone i powolne, a logika aplikacji krucha. Tabela ta jawnie definiuje relacje (np. Gołąb należy do Hodowcy, a Wynik łączy Gołębia z Lotem), co jest fundamentalne dla generowania rodowodów, obliczania statystyk lotowych i przeprowadzania złożonych analiz.
+
+| Tabela | Kolumny | Typ Danych | Opis |
+|---|---|---|---|
+| Fanciers (Hodowcy) | id, name, pzhgp_id, club_id, created_at | SERIAL PRIMARY KEY, VARCHAR, VARCHAR, VARCHAR, TIMESTAMP | Przechowuje informacje o hodowcach. |
+| Lofts (Gołębniki) | id, fancier_id (FK), address, latitude, longitude, is_verified | SERIAL PRIMARY KEY, INTEGER, VARCHAR, DOUBLE, DOUBLE, BOOLEAN | Dane o lokalizacji gołębników. Współrzędne przechowywane w typie geography(Point, 4326) PostGIS. |
+| Pigeons (Gołębie) | id, fancier_id (FK), ring_number (UNIQUE), year, sex, color, strain, sire_id (FK), dam_id (FK) | SERIAL PRIMARY KEY, INTEGER, VARCHAR, INTEGER, VARCHAR, VARCHAR, VARCHAR, INTEGER, INTEGER | Szczegółowe informacje o każdym gołębiu. sire_id i dam_id to klucze obce do tej samej tabeli. |
+| Races (Loty) | id, name, release_point_id (FK), release_datetime_utc, pzhgp_category, total_pigeons_basketed, total_fanciers | SERIAL PRIMARY KEY, VARCHAR, INTEGER, TIMESTAMP, VARCHAR, INTEGER, INTEGER | Dane o lotach konkursowych. Kategoria zgodna z regulaminem PZHGP (A, B, C, Maraton). |
+| ReleasePoints | id, name, latitude, longitude, source_document | SERIAL PRIMARY KEY, VARCHAR, DOUBLE, DOUBLE, VARCHAR | Oficjalne miejsca wypuszczeń PZHGP. Współrzędne w typie geography(Point, 4326) PostGIS. |
+| Results (Wyniki) | id, race_id (FK), pigeon_id (FK), fancier_id (FK), arrival_datetime_utc, clocking_system_id, position, speed_m_per_min, coefficient | SERIAL PRIMARY KEY, INTEGER, INTEGER, INTEGER, TIMESTAMP, VARCHAR, INTEGER, DECIMAL(10, 2), DECIMAL(10, 4) | Wyniki poszczególnych gołębi w danym locie. |
+1.3. Framework Integracji API
+Scentralizowany moduł w backendzie będzie zarządzał całą komunikacją z zewnętrznymi API. Ta "Bramka API" (API Gateway) będzie odpowiedzialna za uwierzytelnianie, ograniczanie liczby zapytań (rate limiting) oraz transformację danych.
+
+Moduł ten będzie udostępniał zunifikowane wewnętrzne punkty końcowe (np. /api/weather/forecast?lat=...&lon=...&altitudes=...), z których będzie mogła korzystać reszta aplikacji. Takie podejście abstrahuje od specyfiki API Open-Meteo, czyniąc system bardziej modularnym i łatwiejszym do utrzymania. W przyszłości umożliwi to ewentualną zmianę dostawcy danych pogodowych bez konieczności modyfikacji całej logiki aplikacji.
+
+Sekcja 2: Potok Przetwarzania i Importu Danych
+Jest to najbardziej krytyczna i wymagająca część rozwoju backendu, która wymaga solidnej inżynierii w celu obsługi zawodnych i niestrukturyzowanych źródeł danych. Sukces całego projektu zależy od zdolności systemu do dokładnego i spójnego agregowania informacji z różnych formatów.
+
+2.1. Uniwersalny Parser Zegarów ESK
+Wyzwanie: Polski Związek Hodowców Gołębi Pocztowych (PZHGP) dopuszcza do użytku szeroką gamę Elektronicznych Systemów Konstatujących (ESK), takich jak Tipes, Tauris, AMC-ESK, Benzing i inne. Każdy z tych systemów prawdopodobnie generuje pliki wyjściowe – "protokół przyporządkowania" (spis gołębi) i "lista zegarowa" (czasy przylotów) – we własnym, często binarnym lub niestandardowym formacie tekstowym.   
+
+Rozwiązanie: Zastosowanie wielostrategicznego silnika parsowania.
+
+Priorytet dla Znanych Formatów: Opracowanie dedykowanych parserów dla najpopularniejszych systemów (np. Benzing, Tipes) na podstawie dostępnej dokumentacji lub poprzez inżynierię wsteczną przykładowych plików.
+
+Fallback do CSV/Tekstu: Dla systemów, które umożliwiają eksport danych do formatu generycznego (co jest prawdopodobne w nowszych modelach), stworzenie elastycznego importera CSV/TSV. Importer ten powinien pozwalać administratorom na interaktywne mapowanie kolumn z pliku na odpowiednie pola w schemacie bazy danych.
+
+OCR dla Wydruków: Dla starszych systemów, z których hodowcy mogą dostarczyć jedynie wydruk, zintegrowanie usługi Optycznego Rozpoznawania Znaków (OCR), np. Google Cloud Vision. Usługa ta będzie ekstrahować dane tabelaryczne ze zeskanowanych dokumentów. Ten proces będzie wymagał etapu ręcznej weryfikacji przez człowieka.
+
+Proces importu danych nie może być w pełni zautomatyzowany; wymaga on przepływu pracy z udziałem człowieka ("human-in-the-loop"). Ogromna różnorodność systemów ESK , w tym starsze wersje oprogramowania, uniemożliwia stworzenie jednego parsera, który działałby bezbłędnie dla wszystkich wejść. Co więcej, dane z PZHGP są publikowane w formatach przeznaczonych do odczytu przez ludzi, takich jak    
+
+.doc i .pdf , które są notorycznie trudne do parsowania ze 100% dokładnością. W pełni zautomatyzowany system albo często by zawodził, albo po cichu importowałby nieprawidłowe dane, co prowadziłoby do korupcji całej bazy danych. Jedynym solidnym rozwiązaniem jest potok importu, w którym system podejmuje próbę sparsowania pliku ("best effort"), a następnie prezentuje wyodrębnione dane w interfejsie internetowym. Administrator może w nim przejrzeć, poprawić i zatwierdzić dane przed ich ostatecznym zapisaniem w głównej bazie danych. Taki mechanizm gwarantuje integralność danych, która jest absolutnie kluczowa dla generowania oficjalnych list konkursowych.   
+
+2.2. Silnik Pozyskiwania Danych PZHGP
+Wyzwanie: Współrzędne geograficzne miejsc wypuszczeń PZHGP są publikowane w różnych formatach na stronie internetowej związku, w tym w tabelach HTML, plikach DOC i PDF. Brak jest oficjalnego, maszynowo-czytelnego API.   
+
+Rozwiązanie: Stworzenie usługi do cyklicznego scrapingu stron internetowych i parsowania dokumentów.
+
+Web Scraper: Skrypt w języku Python, wykorzystujący biblioteki takie jak BeautifulSoup i Scrapy, będzie okresowo przeszukiwał stronę PZHGP (pzhgp.pl) oraz powiązane domeny (np. pzhgp.online) w poszukiwaniu linków do nowych dokumentów ze współrzędnymi.
+
+Parsery Dokumentów: Użycie dedykowanych bibliotek (python-docx, PyPDF2) do ekstrakcji tabel i tekstu z pobranych plików.
+
+Normalizacja Współrzędnych: Wyodrębnione współrzędne są w formacie Stopnie-Minuty-Sekundy (np. 52º51'41”). Muszą one zostać sparsowane i przekonwertowane na stopnie dziesiętne w celu zapisania ich w bazie danych PostGIS. Wymaga to zaimplementowania solidnego parsera opartego na wyrażeniach regularnych.   
+
+Wykrywanie Zmian: System musi śledzić zmiany, o których mowa w dokumentach takich jak ten  ("zmiana współrzędnych miejsca wypuszczania gołębi"). Będzie on porównywał nowo pozyskane współrzędne z już istniejącymi w bazie i oznaczał rozbieżności do weryfikacji przez administratora.   
+
+2.3. Moduł Zarządzania Geolokalizacją i Gołębnikami
+Funkcjonalność: Interfejs przeznaczony dla administratorów do zarządzania danymi hodowców i ich gołębników.
+
+Wprowadzanie Współrzędnych na Mapie: Zgodnie z wymaganiami, moduł ten będzie zawierał interaktywną mapę Mapbox. Administrator będzie mógł wyszukać adres hodowcy (za pomocą Mapbox Geocoding API) lub ręcznie umieścić pinezkę na mapie, aby precyzyjnie ustawić szerokość i długość geograficzną gołębnika. Jest to kluczowe dla dokładności obliczeń odległości lotu.
+
+Przepływ Weryfikacji: Gołębniki będą miały flagę is_verified. Nowe gołębniki dodane do systemu będą miały status "niezweryfikowany", dopóki administrator nie potwierdzi ich lokalizacji. Zapobiegnie to błędom w obliczeniach wyników lotów, które mogłyby powstać w wyniku wprowadzenia nieprawidłowych danych.
+
+Sekcja 3: Silnik Klasyfikacji Lotów i Analityki
+Ten silnik stanowi obliczeniowe serce aplikacji, przekształcając surowe dane w oficjalne wyniki lotów, zgodnie z rygorystycznymi przepisami PZHGP.
+
+3.1. Obliczanie Trasy Lotu i Odległości
+Metodologia: Odległość pomiędzy współrzędnymi miejsca wypuszczenia (tabela ReleasePoints) a współrzędnymi gołębnika każdego hodowcy (tabela Lofts) jest fundamentalną zmienną do obliczenia prędkości. Do tego celu należy zastosować formuły Vincenty'ego zamiast prostszej formuły Haversine'a. Formuły Vincenty'ego są bardziej intensywne obliczeniowo, ale zapewniają dokładność submilimetrową na elipsoidzie ziemskiej, co jest standardem w geodezji precyzyjnej i odpowiada wymaganiom aplikacji "klasy światowej". Obliczenia te mogą być efektywnie wykonane przy użyciu wbudowanych funkcji PostGIS.
+
+3.2. Metryki Wydajności Zgodne z Regulaminem PZHGP
+Obliczanie Prędkości: Podstawowy wzór to V 
+m/min
+​
+ = 
+t 
+min
+​
+ 
+D 
+m
+​
+ 
+​
+ , gdzie V to prędkość w metrach na minutę, D to dystans w metrach, a t to czas lotu w minutach.
+
+Dystans jest obliczany zgodnie z punktem 3.1.
+
+Czas lotu = arrival_datetime_utc - release_datetime_utc.
+
+Obliczenia muszą być wykonywane z dokładnością do dwóch miejsc po przecinku, zgodnie z regulaminem PZHGP.   
+
+Obliczanie Współczynnika (Coefficient): Jest to kluczowa i złożona metryka, która określa wydajność gołębia w stosunku do konkurencji.
+
+Wzór: Podstawowy wzór można wyprowadzić z regulaminu  jako:    
+
+Coeff=( 
+Liczba_Gołębi_w_Konkursie
+Pozycja_na_Li 
+s
+ˊ
+ cie
+​
+ )×1000.
+
+Niuanse Regulaminowe: Implementacja musi ściśle przestrzegać zasad PZHGP :   
+
+Lista konkursowa jest tworzona na bazie 20% (1:5) najlepszych gołębi.   
+
+Liczba_Gołębi_w_Konkursie to zatem 20% z total_pigeons_basketed.
+
+Istnieje minimalna liczba gołębi włożonych na lot, aby można było obliczać współczynnik (np. 250 gołębi).   
+
+Istnieje limit liczby gołębi używanych w mianowniku (zazwyczaj 5000), chociaż może on być zniesiony dla określonych kategorii, np. maratonów.   
+
+Gołębie, które osiągnęły dokładnie tę samą prędkość, otrzymują ten sam współczynnik, niezależnie od ich kolejności na wydrukowanej liście. Algorytm musi poprawnie obsługiwać takie remisy.   
+
+Logika obliczeniowa nie jest statyczna; zależy ona od kategorii lotu i rodzaju współzawodnictwa. Prosty, uniwersalny silnik obliczeniowy nie sprawdzi się. Analiza regulaminów PZHGP ujawnia liczne zasady modyfikujące podstawowe wzory. Na przykład, mistrzostwa GMP używają systemu punktowego ze spadkiem 20%, podczas gdy mistrzostwa w kategoriach opierają się na sumie współczynników. Dlatego architektura systemu musi implementować wzorzec projektowy "Strategia" dla swojego silnika obliczeniowego. Powstaną różne klasy "Strategii Obliczeniowej" (np.
+
+StandardCoeffStrategy, GMPPointsStrategy, SuperMarathonStrategy), które będą hermetyzować specyficzne zasady dla każdego typu współzawodnictwa. Podczas generowania listy konkursowej, aplikacja wybierze odpowiednią strategię na podstawie metadanych lotu, zapewniając dokładność i zgodność ze złożonym i zróżnicowanym zbiorem przepisów PZHGP.
+
+3.3. Dynamiczne Generowanie List Konkursowych
+Frontend aplikacji umożliwi użytkownikom przeglądanie i filtrowanie list konkursowych według różnych kryteriów: lotu, hodowcy, oddziału/regionu oraz typu współzawodnictwa (np. GMP, Kategoria A, Super Maraton). Backend będzie udostępniał punkty końcowe API do generowania tych list w locie, stosując odpowiednie strategie obliczeniowe i filtry. Wyniki będą mogły być eksportowane do formatów PDF i CSV w celu oficjalnego wykorzystania.
+
+Sekcja 4: Analityk Pogodowy AI: Modelowanie Predykcyjne i Strategiczne Wnioski
+Ta sekcja opisuje najbardziej innowacyjną funkcję aplikacji, która wykracza poza proste wyświetlanie pogody, aby dostarczać użytecznych, opartych na AI wniosków strategicznych.
+
+4.1. Pobieranie Danych Pogodowych z Wielu Wysokości przez Open-Meteo
+Uzasadnienie: Gołębie nie latają na jednej, stałej wysokości. Ich pułap lotu zmienia się w zależności od wiatru, ukształtowania terenu i innych czynników, często wahając się od 250 m do ponad 1000 m. Dlatego dane pogodowe z poziomu gruntu są niewystarczające do rzetelnej analizy.   
+
+Implementacja: System będzie odpytywał API Open-Meteo o dane dla siatki punktów wzdłuż trasy lotu na wielu poziomach ciśnienia (np. powierzchnia, 950hPa, 850hPa, 700hPa) i wysokościach (np. 10m, 100m, 250m, 500m).
+
+Tabela 2: Wybór Parametrów API Open-Meteo do Analizy Lotu Ptaków
+Poniższa tabela tworzy definitywne mapowanie pomiędzy abstrakcyjnymi wymaganiami analizy lotu gołębi a konkretnymi, dostępnymi do zapytania parametrami w API Open-Meteo. Działa ona jako specyfikacja techniczna dla modułu pobierania danych pogodowych. API Open-Meteo jest ogromne i oferuje setki zmiennych. Stwierdzenie "pobierz dane pogodowe" nie jest instrukcją możliwą do wykonania. Ta tabela destyluje wyniki badań naukowych nad lotem gołębi do precyzyjnej listy parametrów API. Określa nie tylko
+
+jakie dane pobrać (np. "wiatr"), ale także na jakich wysokościach i z którego punktu końcowego API (np. Forecast API vs. Ensemble API dla prawdopodobieństwa). Ta specyfika jest kluczowa dla prawidłowego zbudowania zarówno modelu AI, jak i warstw wizualizacyjnych.
+
+| Potrzeba Analityczna | Istotne Zjawisko Pogodowe | Parametr(y) Open-Meteo | Wysokości/Poziomy | Punkt Końcowy API |
+|---|---|---|---|---|
+| Wspomaganie/Utrudnianie Lotu | Wiatr czołowy/tylny/boczny | wind_speed, wind_direction | 10m, 100m, 250m, 500m, 850hPa, 700hPa | Forecast API |
+| Wytrzymałość/Zdrowie Gołębia | Indeks temperaturowo-wilgotnościowy (THI) | temperature_2m, relative_humidity_2m | 2m (do obliczenia THI) | Forecast API |
+| Widoczność Nawigacyjna | Mgła, podstawa chmur, ogólna widoczność | visibility, cloud_cover, cloud_cover_low, fog | Powierzchnia, niskie poziomy | Forecast API, DMI API |
+| Zakłócenie Lotu | Opady, burze | precipitation, showers, snowfall, cape | Powierzchnia | Forecast API |
+| Stabilność Atmosfery | Energia potencjalna konwekcji (CAPE) | cape | Powierzchnia | Forecast API |
+| Gęstość/Ciśnienie Powietrza | Ciśnienie atmosferyczne | pressure_msl, surface_pressure | MSL, powierzchnia, poziomy ciśnienia | Ensemble API |
+| Wybór Pułapu Lotu | Uskok wiatru, inwersje temperatury | wind_speed, temperature | Wiele wysokości do wykrywania gradientów | Ensemble API |
+
+4.2. Model AI do Predykcji Bezpieczeństwa i Wydajności Lotu
+Typ Modelu: Model oparty na wzmacnianiu gradientowym (np. XGBoost lub LightGBM) jest dobrze dopasowany do tego zadania, ponieważ efektywnie radzi sobie z danymi tabelarycznymi i potrafi wychwycić złożone, nieliniowe zależności między zmiennymi pogodowymi.
+
+Dane Treningowe: Model będzie trenowany na historycznych danych lotów z własnej bazy danych aplikacji, skorelowanych z historycznymi danymi pogodowymi pobranymi z API Historycznego Open-Meteo. Każdy punkt danych będzie reprezentował wynik jednego gołębia w jednym locie, wzbogacony o warunki pogodowe na jego konkretnej trasie.
+
+Cechy (Dane Wejściowe): Dystans lotu, pora dnia oraz bogaty zestaw cech meteorologicznych pochodzących z danych z Tabeli 2 (np. średni komponent wiatru tylnego na 850hPa, maksymalny poryw wiatru bocznego, minimalna widoczność na trasie, średni THI).
+
+Cele (Dane Wyjściowe): Model będzie przewidywał dwa kluczowe wyniki:
+
+Prawdopodobieństwo Powrotu: Zadanie klasyfikacyjne (np. prawdopodobieństwo powrotu w czasie trwania konkursu).
+
+Przewidywane Odchylenie Prędkości: Zadanie regresyjne przewidujące procentowe odchylenie od średniej prędkości gołębia (np. +10% dla szybkiego lotu, -15% dla wolnego lotu).
+
+4.3. "Indeks Sprawiedliwości": Nowatorski Algorytm Oparty na AI
+Położenie gołębnika jest decydującą, zależną od pogody zmienną, którą obecne systemy ignorują. Badania i dyskusje w społeczności hodowców jasno wskazują, że kierunek wiatru i fronty atmosferyczne tworzą znaczące przewagi dla pewnych lokalizacji gołębników. Hodowca na wschodnim skraju trasy lotu przy silnym zachodnim wietrze ma ogromną przewagę. Prosty raport pogodowy dla miejsca wypuszczenia jest bezużyteczny. Aby stworzyć analizę "klasy światowej", AI musi modelować
+
+cały korytarz lotu jako dynamiczny system. Algorytm "Indeksu Sprawiedliwości" będzie działał następująco:
+
+Definicja Korytarza Lotu: Dla danego lotu, system tworzy wielokąt obejmujący miejsce wypuszczenia i wszystkie uczestniczące gołębniki.
+
+Przestrzenno-Czasowa Siatka Pogodowa: System odpytuje Open-Meteo o dane pogodowe dla siatki punktów o wysokiej rozdzielczości (np. co 10 km) wewnątrz tego korytarza, dla każdej godziny trwania lotu.
+
+Symulacja Idealnych Tras Lotu: Dla każdego gołębnika obliczana jest trasa po ortodromie od miejsca wypuszczenia.
+
+Obliczenie Ekspozycji na Warunki Pogodowe na Trasie: Dla każdej symulowanej trasy, system całkuje warunki pogodowe wzdłuż tej trasy w czasie. Oznacza to obliczenie średniego wiatru tylnego, całkowitej ekspozycji na opady, czasu spędzonego pod wiatr itp. dla indywidualnej trasy każdego hodowcy.
+
+Identyfikacja Anomalii: System porównuje "ekspozycję pogodową" dla każdego gołębnika ze średnią dla całego lotu. Gołębniki ze znacznie wyższym komponentem wiatru tylnego lub mniejszą ekspozycją na deszcz zostaną zidentyfikowane.
+
+Generowanie Oceny Sprawiedliwości: AI wygeneruje ocenę (np. od -10 dla bardzo niekorzystnych warunków do +10 dla bardzo korzystnych) oraz podsumowanie tekstowe: "Hodowcy w sektorze wschodnim mają znaczącą przewagę ze względu na stały wiatr tylny, podczas gdy ci na północy mogą napotkać front deszczowy nadciągający po godzinie 14:00". Zapewnia to bezprecedensowy poziom strategicznego wglądu.
+
+Sekcja 5: Interfejs Wizualizacyjny Wysokiej Wierności: Mistrzowska Klasa Mapbox
+Ta sekcja szczegółowo opisuje, jak przełożyć złożone dane pogodowe i lotowe na intuicyjną, interaktywną i wizualnie oszałamiającą mapę 3D, mocno inspirowaną aplikacją Ventusky.
+
+5.1. Fundament: Konfiguracja Mapbox GL JS dla 3D
+Inicjalizacja mapy z opcją projection: 'globe' w celu stworzenia immersyjnego widoku 3D.
+
+Włączenie terenu 3D przy użyciu wysokowydajnych kafelków DEM (Digital Elevation Model) od Mapbox, aby dokładnie odwzorować krajobraz, nad którym lecą gołębie.
+
+Wykorzystanie Sky API do tworzenia realistycznych efektów atmosferycznych (cykle dnia i nocy, mgła), które odpowiadają czasowi trwania lotu.
+
+5.2. Dynamiczne Warstwy Pogodowe
+Wiatr: Implementacja animacji cząsteczkowych przy użyciu niestandardowych warstw w Mapbox GL JS. Prędkość i kierunek cząsteczek będą napędzane bezpośrednio przez wielopoziomowe wektorowe dane wiatru z Open-Meteo. Interfejs użytkownika pozwoli na przełączanie się między różnymi warstwami wysokości (np. 10m, 250m, 850hPa), podobnie jak w Ventusky. Wykorzysta to zdolność Mapbox do wizualizacji danych rastrowych i animacji cząsteczkowych.
+
+Temperatura, Ciśnienie, Wilgotność: Użycie warstw typu fill-extrusion lub heatmap sterowanych danymi. Kolor i intensywność mapy ciepła będą reprezentować wartość zmiennej meteorologicznej. Rampy kolorów zostaną starannie dobrane, aby były intuicyjne (np. błękity dla zimna, czerwienie dla gorąca), co jest chwalone w analizie Ventusky.
+
+Chmury i Mgła: Użycie półprzezroczystych warstw fill dla zachmurzenia. W przypadku mgły, wykorzystanie wbudowanych stylów mgły w Mapbox lub stworzenie niestandardowych warstw wolumetrycznych dla bardziej realistycznego efektu 3D. Modele DMI i KMA dostępne przez Open-Meteo dostarczają specyficznych parametrów fog na wysokości 2m, które można bezpośrednio zwizualizować.
+
+Opady: Użycie animowanych warstw rastrowych lub niestandardowych shaderów do symulacji deszczu i śniegu, podobnie jak w demonstracji Rain and Snow od Mapbox.
+
+5.3. Wizualizacja Animowanej Trasy Lotu w 3D
+Renderowanie Trasy: Dla każdego gołębia, trasa lotu od miejsca wypuszczenia do gołębnika będzie renderowana jako trójwymiarowa linia (linestring) nałożona na model terenu.
+
+Stylizacja Sterowana Danymi: Właściwości linii będą dynamiczne. Na przykład, jej kolor może reprezentować prędkość gołębia (np. zielony dla szybkiego, czerwony dla wolnego), a jej grubość może reprezentować napotkany wiatr czołowy. Zapewni to natychmiastową analizę wizualną przebiegu lotu.
+
+Animacja: Wykorzystanie technik opisanych w przykładach Mapbox do animowania punktu (reprezentującego gołębia) wzdłuż obliczonej trasy. Prędkość animacji będzie odpowiadać rzeczywistej prędkości lotu gołębia, tworząc potężną funkcję "powtórki lotu".
+
+5.4. Projekt Komponentów UI (Inspiracja Ventusky)
+Panel Kontroli Warstw: Boczny panel menu, pozwalający użytkownikom na włączanie i wyłączanie różnych warstw pogodowych (Wiatr, Temperatura, itp.) oraz wybór wysokości dla każdej z nich.
+
+Oś Czasu (Scrubber): Oś czasu na dole ekranu, umożliwiająca przewijanie 14-dniowej prognozy w przód i w tył, z wizualizacjami na mapie aktualizującymi się w czasie rzeczywistym.
+
+Wyskakujące Okienka Informacyjne: Kliknięcie w dowolny punkt na mapie wyświetli szczegółowe okienko z precyzyjnymi danymi pogodowymi dla tej lokalizacji i czasu, podobnie jak w Ventusky.
+
+Sekcja 6: Doświadczenie Użytkownika i Interakcja Głosowa
+Ta sekcja koncentruje się na uczynieniu potężnych funkcji aplikacji dostępnymi, zwłaszcza dla docelowej grupy demograficznej, która często składa się z osób starszych.
+
+6.1. Implementacja Modułu Poleceń Głosowych
+Technologia: Web Speech API, a konkretnie interfejs SpeechRecognition, zapewnia niezbędną, natywną dla przeglądarek funkcjonalność zamiany mowy na tekst. Dla bardziej solidnej obsługi poleceń i uproszczenia rozwoju, można użyć biblioteki opakowującej, takiej jak
+
+artyom.js lub
+
+react-speech-recognition.
+
+Polecenia głosowe muszą kontrolować kluczowe wymiary danych aplikacji: Co (Warstwa), Gdzie (Lokalizacja) i Kiedy (Czas). Baza użytkowników jest starsza, co może czynić złożony, wielowarstwowy interfejs UI onieśmielającym. Sterowanie głosem nie jest tu gadżetem, lecz podstawową funkcją dostępności. Prosty zestaw poleceń jest niewystarczający. Gramatyka głosowa musi być zaprojektowana wokół kluczowych interaktywnych elementów aplikacji: selektora warstw, lokalizacji na mapie i osi czasu. Prowadzi to do ustrukturyzowanej gramatyki, która pozwala na złożone polecenia, sprawiając, że interakcja jest naturalna i potężna, bezpośrednio rozwiązując wyzwanie sterowania interfejsem podobnym do Ventusky bez użycia myszy.
+
+### Tabela 3: Gramatyka Poleceń Głosowych
+Poniższa tabela definiuje konkretne frazy i struktury poleceń, które silnik rozpoznawania mowy aplikacji będzie zaprogramowany do rozumienia. Służy ona jako specyfikacja dla deweloperów interakcji głosowych. Zamiast ogólnikowego "dodaj sterowanie głosem", tabela ta dostarcza konkretną, ustrukturyzowaną gramatykę, którą deweloperzy mogą zaimplementować. Rozkłada ona złożone intencje użytkownika na rozpoznawalne wzorce ze zmiennymi (slotami). Na przykład, definiuje, jak użytkownik może określić warstwę pogodową, wysokość i czas w jednym zdaniu. Takie ustrukturyzowane podejście jest niezbędne do zbudowania niezawodnego interfejsu głosowego, który wykracza poza proste słowa kluczowe i rozumie intencje użytkownika w specyficznym kontekście aplikacji.
+
+| Intencja Użytkownika | Struktura Polecenia | Przykładowe Frazy |
+|---|---|---|
+| Kontrola Warstwy Pogodowej | (Pokaż / Włącz) na | "Pokaż wiatr na 850 hektopaskali", "Włącz temperaturę na 2 metrach" |
+| Kontrola Czasu | Ustaw czas na, Przewiń do | "Ustaw czas na jutro 10 rano", "Przewiń do niedzieli" |
+| Zapytanie o Lokalizację | Jaka pogoda w? | "Jaka pogoda w Szczecinie?" |
+| Analiza Lotu | (Analizuj / Pokaż) lot | "Analizuj lot Barcelona" |
+| Analiza Sprawiedliwości | Sprawdź warunki dla lotu | "Sprawdź warunki dla lotu Bruksela" |
+| Szczegóły Gołębia | Pokaż wyniki gołębia | "Pokaż wyniki gołębia PL-0123-20-4567" |
+
+6.2. Zasady UI/UX dla Aplikacji o Dużej Gęstości Danych
+Stopniowe Ujawnianie (Progressive Disclosure): Nie należy wyświetlać wszystkich kontrolek naraz. Aplikacja powinna startować z czystą mapą, pozwalając użytkownikom na otwieranie paneli z warstwami, ustawieniami i analizami w miarę potrzeb.
+
+Czytelna Hierarchia Wizualna: Należy użyć koloru, rozmiaru i rozmieszczenia, aby prowadzić wzrok użytkownika do najważniejszych informacji. Mapa jest głównym elementem; kontrolki powinny być drugorzędne.
+
+Projektowanie Dostępne: Należy zapewnić wysoki współczynnik kontrastu, czytelne rozmiary czcionek oraz duże, łatwe do kliknięcia elementy dla wszystkich komponentów UI, aby dostosować aplikację do użytkowników z potencjalnymi wadami wzroku lub motoryki.
+
+Sekcja 7: Mapa Drogowa Innowacyjnych Funkcji: Poza Rdzeniem
+Te funkcje wyróżnią aplikację na tle istniejącego oprogramowania, przekształcając ją w niezbędne narzędzie dla poważnych hodowców.
+
+7.1. Analiza Historycznych Wyników w Kontekście Pogody
+Wykorzystanie API Historycznego Pogody Open-Meteo do pobrania dokładnych warunków pogodowych dla każdego historycznego lotu, w którym dany gołąb brał udział.
+
+System będzie generował "Profil Wydajności" dla każdego gołębia, identyfikując jego mocne i słabe strony (np. "Ten gołąb regularnie osiąga wyniki o 15% powyżej średniej przy silnym wietrze tylnym, ale ma problemy przy wysokiej wilgotności"). Dostarczy to opartych na danych wniosków do selekcji gołębi na konkretne loty.
+
+7.2. Wizualizacja Anomalii Geomagnetycznych
+Uzasadnienie: Literatura naukowa sugeruje, że gołębie wykorzystują pole magnetyczne Ziemi do nawigacji, a burze słoneczne lub lokalne anomalie magnetyczne mogą zakłócać tę zdolność.
+
+Implementacja: Pozyskanie publicznego zbioru danych o anomaliach pola magnetycznego Ziemi (np. z NOAA lub innych źródeł geofizycznych). Zintegrowanie tych danych jako przełączalnej warstwy heatmap na mapie Mapbox. Podczas planowania lub analizy lotu, użytkownicy będą mogli nałożyć te dane, aby sprawdzić, czy trasa lotu przecina obszary o znanych zakłóceniach magnetycznych, co może stanowić potencjalne wyjaśnienie nieoczekiwanych wyników lub strat.
+
+7.3. Podsumowania Prognozy Lotu Generowane przez AI
+Funkcjonalność: Połączenie predykcji Analityka Pogodowego AI (Sekcja 4) z Dużym Modelem Językowym (LLM) w celu wygenerowania zwięzłego, naturalnego językowo podsumowania nadchodzących warunków lotu.
+
+Dostarczanie przez Text-to-Speech: Użycie interfejsu SpeechSynthesis z Web Speech API do odczytania tego podsumowania na głos, zapewniając hodowcy "poranny briefing". Przykład: "Dzień dobry. Prognoza na lot z Brukseli wskazuje na umiarkowany wiatr tylny przez pierwsze 200 kilometrów, co powinno sprzyjać wysokim prędkościom. Jednakże, do zachodniej części korytarza lotu zbliża się układ niskiego ciśnienia, a gołębniki w tym rejonie powinny spodziewać się deszczu po godzinie 15:00. Ogólne bezpieczeństwo lotu oceniane jest jako dobre, z lekką przewagą dla gołębników wschodnich."
+
+Sekcja 8: Przewodnik Implementacyjny dla Cursor IDE: Zasady i Prompty
+Ta ostatnia sekcja stanowi ustrukturyzowaną bibliotekę wysokopoziomowych promptów i zasad architektonicznych, które mają na celu pokierowanie asystentem kodowania AI. Jest ona zorganizowana tak, aby odzwierciedlać poprzednie sekcje dokumentu.
+
+### 8.1. Konfiguracja Zasad (Rules) w Cursor IDE
+Aby zapewnić, że AI generuje kod zgodny z architekturą projektu i najlepszymi praktykami, kluczowe jest zdefiniowanie zasad (Rules). Cursor obsługuje dwa główne typy zasad: globalne (User Rules) i projektowe (Project Rules).
+
+#### 8.1.1. Globalne Zasady Użytkownika (User Rules)
+Zasady te są definiowane w ustawieniach Cursora (Settings > Rules > User Rules) i mają zastosowanie do wszystkich projektów. Są idealne do określania osobistych preferencji i ogólnych wytycznych.
+
+Przykładowa konfiguracja Globalnych Zasad Użytkownika:
+
+- Zawsze używaj TypeScript dla całego kodu; preferuj interfejsy nad typami.
+- Unikaj enums; zamiast tego używaj obiektów const.
+- Używaj komponentów funkcyjnych z interfejsami TypeScript dla propsów.
+- Włącz tryb ścisły (strict mode) w TypeScript dla lepszego bezpieczeństwa typów.
+- Preferuj programowanie funkcyjne i deklaratywne nad wzorcami obiektowymi. Unikaj klas, chyba że jest to wymagane przez framework.
+- Używaj Tailwind CSS do stylizacji.
+- Do żądań sieciowych zawsze używaj `fetch` zamiast bibliotek takich jak axios.
+- Zawsze używaj `date-fns` do wszelkich manipulacji lub porównań dat.
+- Używaj wielkości liter zdaniowych (sentence case) dla wszystkich tekstów - nie Title Case.
+
+### 8.1.2. Zasady Projektowe (Project Rules)
+Zasady te znajdują się w katalogu .cursor/rules/ w głównym folderze projektu i są kontrolowane wersją, co oznacza, że są współdzielone z całym zespołem. Każda zasada jest osobnym plikiem
+
+.mdc, co pozwala na precyzyjne i kontekstowe sterowanie AI.
+
+#### Typy Zasad Projektowych :
+
+| Typ Zasady | Opis |
+|---|---|
+| Always | Zawsze dołączana do kontekstu modelu dla danego projektu. |
+| Auto Attached | Dołączana tylko wtedy, gdy pliki pasujące do wzorca globs znajdują się w kontekście AI. |
+| Agent Requested | Dostępna dla AI, która decyduje, czy ją pobrać i użyć na podstawie opisu (description). |
+| Manual | Dołączana tylko wtedy, gdy zostanie jawnie wywołana w czacie za pomocą @nazwaZasady. |
+
+Przykładowe pliki .mdc dla projektu Columba:
+
+Plik: .cursor/rules/backend-api.mdc
+
+Cel: Egzekwowanie standardów dla endpointów API.
+
+Fragment kodu
+
+---
+description: "Standardy dla endpointów API, w tym walidacja i obsługa błędów."
+globs: ["src/backend/api/**/*.ts"]
+alwaysApply: false
+---
+# Zasady dla Endpointów API
+- Używaj `zod` do walidacji wszystkich przychodzących żądań (ciało, parametry, zapytania).
+- Zawsze zwracaj błędy w ustrukturyzowanym formacie JSON: `{ "error": { "message": "...", "code": "..." } }`.
+- Cała logika biznesowa musi być zawarta w serwisach (katalog `src/backend/services`), a kontrolery API powinny być jak najcieńsze.
+- Używaj `Prisma` jako ORM do wszystkich interakcji z bazą danych PostgreSQL. Odwołaj się do schematu w `src/prisma/schema.prisma`.
+Plik: .cursor/rules/pzhgp-logic.mdc
+
+Cel: Zapewnienie zgodności z logiką obliczeniową PZHGP.
+
+Fragment kodu
+
+---
+description: "Zasady obliczeniowe dla logiki zgodnej z regulaminem PZHGP."
+alwaysApply: false
+---
+# Zasady Obliczeniowe PZHGP
+- Podczas implementacji lub modyfikacji logiki obliczeniowej dla list konkursowych, ściśle przestrzegaj wzorca projektowego "Strategia" zdefiniowanego w `src/backend/services/race-calculator/`.
+- Każda nowa strategia obliczeniowa (np. dla nowego typu mistrzostw) musi implementować interfejs `CalculationStrategy`.
+- W celu uzyskania szczegółowych informacji o wzorach na współczynnik (coefficient) i punktację GMP, odwołaj się do wewnętrznej dokumentacji: `docs/pzhgp-rules.md`.
+- Unikaj umieszczania logiki obliczeniowej bezpośrednio w kontrolerach lub modelach.
+Plik: .cursor/rules/mapbox-visualization.mdc
+
+Cel: Utrzymanie spójności w wizualizacjach na mapach.
+
+Fragment kodu
+
+---
+description: "Wytyczne dotyczące implementacji wizualizacji na mapach za pomocą Mapbox."
+globs: ["src/frontend/components/Map/**/*.tsx"]
+alwaysApply: false
+---
+# Wytyczne Wizualizacji Mapbox
+- Wszystkie komponenty frontendu związane z mapami muszą używać biblioteki `Mapbox GL JS`.
+- Warstwy pogodowe (wiatr, temperatura) powinny być implementowane jako warstwy niestandardowe (`custom layer`) w celu uzyskania animacji cząsteczkowych.
+- Zawsze inicjuj mapę z projekcją `globe` i włączonym terenem 3D (`map.setTerrain(...)`).
+- Odwołaj się do `src/frontend/components/Map/layers/WindLayer.tsx` jako referencyjnej implementacji animowanej warstwy.
+- Używaj haków `useMap` do zarządzania instancją mapy w komponentach React.
+
+### 8.2. Przykładowe Prompty dla Generowania Kodu
+#### Zasada Architektoniczna (Sekcja 1.1):
+
+"Cały backend musi być zaimplementowany w Node.js z TypeScript. Użyj frameworka Express.js do obsługi routingu. Wszystkie operacje na bazie danych muszą być obsługiwane przez ORM, taki jak Prisma lub TypeORM, aby zapewnić bezpieczeństwo typów i łatwość zarządzania schematem."
+
+#### Prompt (Sekcja 1.2):
+
+"Używając Node.js z biblioteką pg i PostGIS, wygeneruj instrukcje SQL CREATE TABLE dla następujących schematów: Fanciers, Lofts, Pigeons, Races, ReleasePoints i Results. Tabele Lofts i ReleasePoints muszą używać typu PostGIS geography(Point, 4326) dla współrzędnych. Upewnij się, że ograniczenia klucza obcego są poprawnie zdefiniowane. Tabela Pigeons potrzebuje samoodwołującego się klucza obcego dla sire_id i dam_id. Wszystkie tabele powinny zawierać znaczniki czasu created_at i updated_at."
+
+#### Prompt (Sekcja 2.2):
+
+"Napisz skrypt w Pythonie używając biblioteki python-docx do parsowania pliku .doc zawierającego tabelę z miejscami wypuszczeń gołębi. Skrypt powinien wyodrębnić kolumny 'Miejsce wypuszczenia', 'Szer.geogr.' i 'Dł. geogr.'. Następnie napisz funkcję, która konwertuje współrzędne w formacie DMS (np. '52º51'41”') na stopnie dziesiętne."
+
+#### Prompt (Sekcja 3.2):
+
+"Zaimplementuj w TypeScript klasę CoefficientCalculator zgodną ze wzorcem projektowym 'Strategia'. Stwórz interfejs CalculationStrategy z metodą calculate(results: Result): Result. Zaimplementuj dwie strategie: StandardCoeffStrategy, która oblicza współczynnik na bazie 1:5 z limitem 5000 gołębi, oraz GMPPointsStrategy, która przyznaje punkty ze spadkiem 20%, gdzie pierwszy gołąb otrzymuje 40 punktów."
+
+#### Zasada Architektoniczna (Sekcja 4.3):
+
+"Podczas budowy modułu 'Indeks Sprawiedliwości', podstawowa logika nie może opierać się na pojedynczym punkcie danych pogodowych. Musi ona odpytywać API Open-Meteo o siatkę punktów pokrywającą cały wielokąt korytarza lotu. Ostateczna analiza musi być oparta na całce warunków pogodowych doświadczonych wzdłuż każdej indywidualnej trasy lotu w czasie trwania wyścigu."
+
+#### Prompt (Sekcja 5.2):
+
+"Używając Mapbox GL JS v3, stwórz niestandardową warstwę ('custom layer') do animacji cząsteczek wiatru. Dane wejściowe to siatka wektorów wiatru (prędkość i kierunek) dla określonej wysokości. Cząsteczki powinny poruszać się zgodnie z wektorami i zanikać po określonym czasie życia. Zapewnij, że gęstość cząsteczek odpowiada prędkości wiatru."
+
+#### Prompt (Sekcja 6.1):
+
+"Zintegruj hook useSpeechRecognition z biblioteki react-speech-recognition z komponentem React. Zdefiniuj gramatykę poleceń, która rozpoznaje wzorce takie jak 'pokaż [warstwa] na [wysokość]'. Po rozpoznaniu polecenia, wywołaj funkcję zwrotną, która aktualizuje stan aplikacji, zmieniając widoczną warstwę i wysokość na mapie Mapbox."
