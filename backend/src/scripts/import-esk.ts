@@ -119,14 +119,11 @@ async function importData(filePath: string) {
 
     console.log(`Processing fancier: ${fancierData.name} (${fancierData.pzhgpId})`);
 
-    const fancier = await prisma.fancier.upsert({
+    const existingFancier = await prisma.fancier.findFirst({
       where: { pzhgpId: fancierData.pzhgpId },
-      update: { name: fancierData.name },
-      create: {
-        name: fancierData.name,
-        pzhgpId: fancierData.pzhgpId,
-      },
-    });
+    });   where: { id: existingFancier.id },
+        data: { name: fancierData.name },; });
+    }
 
     let createdPigeons = 0;
     for (const p of fancierData.pigeons) {

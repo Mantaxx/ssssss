@@ -26,18 +26,18 @@ export class WeatherAnalysis {
       include: {
         race: {
           include: {
-            release_point: true,
+            releasePoint: true,
           },
         },
         pigeon: true,
       },
-      orderBy: { race: { release_datetime_utc: 'desc' } },
+      orderBy: { race: { releaseDatetimeUtc: 'desc' } },
     });
 
     const historicalData: HistoricalWeatherData[] = [];
 
     for (const result of results) {
-      if (!result.race?.release_datetime_utc) continue;
+      if (!result.race?.releaseDatetimeUtc) continue;
 
       // TODO: Fetch historical weather data from Open-Meteo History API
       // For now, return mock data
@@ -51,13 +51,13 @@ export class WeatherAnalysis {
 
       historicalData.push({
         raceId: result.raceId!,
-        raceName: result.race.name || 'Unknown Race',
-        releaseDate: result.race.release_datetime_utc,
+        raceName: result.race.name ?? 'Unknown Race',
+        releaseDate: result.race.releaseDatetimeUtc,
         weatherConditions,
         pigeonPerformance: [{
-          ringNumber: result.pigeon?.ring_number || 'Unknown',
-          speed: Number(result.speed_m_per_min) || 0,
-          position: result.position || 0,
+          ringNumber: result.pigeon?.ringNumber ?? 'Unknown',
+          speed: Number(result.speedMPerMin) || 0,
+          position: result.position ?? 0,
           coefficient: Number(result.coefficient) || 0,
         }],
       });

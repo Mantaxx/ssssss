@@ -128,7 +128,7 @@ export class CompetitionListExporter {
     });
 
     await browser.close();
-    return pdfBuffer;
+    return Buffer.from(pdfBuffer);
   }
   static async exportFromResults(results: ResultWithRelations[]): Promise<CompetitionListData | null> {
     if (results.length === 0) {
@@ -138,15 +138,15 @@ export class CompetitionListExporter {
 
     return {
       raceId: firstResult.race.id,
-      raceName: firstResult.race.name,
-      releaseDate: firstResult.race.release_datetime_utc.toISOString().split('T')[0],
+      raceName: firstResult.race.name ?? 'Unknown Race',
+      releaseDate: firstResult.race.releaseDatetimeUtc?.toISOString().split('T')[0] ?? 'N/A',
       totalPigeons: results.length,
       results: results.map((result) => ({
-        position: result.position,
+        position: result.position ?? 0,
         ringNumber: result.pigeon.ringNumber,
-        fancierName: result.fancier.name,
-        arrivalTime: result.arrival_datetime_utc.toISOString(),
-        speed: Number(result.speed_m_per_min) || 0,
+        fancierName: result.fancier.name ?? 'Unknown Fancier',
+        arrivalTime: result.arrivalDatetimeUtc?.toISOString() ?? '',
+        speed: Number(result.speedMPerMin) || 0,
         coefficient: Number(result.coefficient) || 0,
       })),
     };
